@@ -292,7 +292,7 @@ if [[ "$MBTILES_BIN" != "-" ]]; then
   $MBTILES_BIN copy "$TEST_FILES_DIR/world_cities.mbtiles" "$TEST_TEMP_DIR/world_cities_diff.mbtiles" --diff-with-file "$TEST_FILES_DIR/world_cities_modified.mbtiles" --force-simple 2>&1 | tee "$TEST_OUT_DIR/copy_diff.txt"
   # Apply this diff to the original version of the file
   cp "$TEST_FILES_DIR/world_cities.mbtiles" "$TEST_TEMP_DIR/world_cities_copy.mbtiles"
-  $TEST_FIXTURES_DIR/apply_diff.sh "$TEST_TEMP_DIR/world_cities_copy.mbtiles" "$TEST_TEMP_DIR/world_cities_diff.mbtiles"
+  $MBTILES_BIN apply-diff "$TEST_TEMP_DIR/world_cities_copy.mbtiles" "$TEST_TEMP_DIR/world_cities_diff.mbtiles" 2>&1 | tee "$TEST_OUT_DIR/apply_diff.txt"
   # Ensure that applying the diff resulted in the modified version of the file
   $MBTILES_BIN copy "$TEST_FILES_DIR/world_cities_modified.mbtiles" "$TEST_TEMP_DIR/world_cities_diff_modified.mbtiles" --diff-with-file "$TEST_TEMP_DIR/world_cities_copy.mbtiles" --force-simple 2>&1
   CMP_APPLIED=$(sqlite3 "$TEST_TEMP_DIR/world_cities_diff_modified.mbtiles" "SELECT COUNT(*) FROM tiles;")

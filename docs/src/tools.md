@@ -21,11 +21,9 @@ Copy an mbtiles file, optionally filtering its content by zoom levels. Can also 
 mbtiles copy src_file.mbtiles dst_file.mbtiles --min-zoom 0 --max-zoom 10 --force-simple
 ```
 
-This command can also be used to compare two mbtiles files and generate a diff.
+### apply-diff
+Apply the diff file generated from `copy` to an mbtiles file. The diff file can be applied to the `src_file.mbtiles` elsewhere, to avoid copying large files when only small updates are needed.
 ```shell
-mbtiles copy src_file.mbtiles diff_file.mbtiles --force-simple --diff-with-file modified_file.mbtiles
+mbtiles apply_diff src_file.mbtiles diff_file.mbtiles
 ```
-* The `diff_file.mbtiles` can then be applied to the `src_file.mbtiles` elsewhere, to avoid copying large files when only small updates are needed. To do this, you may want to copy and then use [apply_diff.sh](/tests/fixtures/apply_diff.sh) as follows.
-
-        ./apply_diff.sh src_file.mbtiles diff_file.mbtiles
   **_NOTE:_** This _only_ works for mbtiles files in the simple tables format; it does _not_ work for mbtiles files in deduplicated format.
