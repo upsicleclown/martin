@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use martin_mbtiles::{copy_mbtiles_file, Mbtiles, TileCopierOptions};
+use martin_mbtiles::{apply_mbtiles_diff, copy_mbtiles_file, Mbtiles, TileCopierOptions};
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, SqliteConnection};
 
@@ -45,6 +45,14 @@ enum Commands {
     /// Copy tiles from one mbtiles file to another.
     #[command(name = "copy")]
     Copy(TileCopierOptions),
+    /// Apply diff file generated from 'copy' command
+    #[command(name = "apply-diff")]
+    ApplyDiff {
+        /// MBTiles file to apply diff to
+        src_file: PathBuf,
+        /// Diff file
+        diff_file: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -57,6 +65,12 @@ async fn main() -> Result<()> {
         }
         Commands::Copy(opts) => {
             copy_mbtiles_file(opts).await?;
+        }
+        Commands::ApplyDiff {
+            src_file,
+            diff_file,
+        } => {
+            apply_mbtiles_diff(src_file, diff_file).await?;
         }
     }
 

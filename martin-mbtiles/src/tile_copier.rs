@@ -122,7 +122,7 @@ impl TileCopier {
     }
 
     pub async fn run(self) -> MbtResult<SqliteConnection> {
-        let storage_type = self.detect_type(&self.src_mbtiles).await?;
+        let storage_type = detect_type(&self.src_mbtiles).await?;
         let force_simple = self.options.force_simple && storage_type != MbtType::TileTables;
 
         let opt = SqliteConnectOptions::new()
@@ -194,7 +194,7 @@ impl TileCopier {
         if let Some(diff_file) = &self.options.diff_with_file {
             let diff_mbtiles = Mbtiles::new(diff_file)?;
 
-            let _ = &self.detect_type(&diff_mbtiles);
+            let _ = detect_type(&diff_mbtiles).await?;
 
             query("ATTACH DATABASE ? AS newDb")
                 .bind(diff_mbtiles.filepath())
@@ -280,14 +280,52 @@ impl TileCopier {
 
         Ok(())
     }
+}
+async fn detect_type(mbtiles: &Mbtiles) -> MbtResult<MbtType> {
+    let opt = SqliteConnectOptions::new()
+        .read_only(true)
+        .filename(mbtiles.filepath());
+    let mut conn = SqliteConnection::connect_with(&opt).await?;
+    mbtiles.detect_type(&mut conn).await
+}
 
-    async fn detect_type(&self, mbtiles: &Mbtiles) -> MbtResult<MbtType> {
-        let opt = SqliteConnectOptions::new()
-            .read_only(true)
-            .filename(mbtiles.filepath());
-        let mut conn = SqliteConnection::connect_with(&opt).await?;
-        mbtiles.detect_type(&mut conn).await
+pub async fn apply_mbtiles_diff(
+    src_file: PathBuf,
+    diff_file: PathBuf,
+) -> MbtResult<SqliteConnection> {
+    let src_mbtiles = Mbtiles::new(src_file)?;
+    let diff_mbtiles = Mbtiles::new(diff_file)?;
+
+    let opt = SqliteConnectOptions::new().filename(src_mbtiles.filepath());
+    let mut conn = SqliteConnection::connect_with(&opt).await?;
+    let src_type = src_mbtiles.detect_type(&mut conn).await?;
+
+    if src_type != MbtType::TileTables {
+        return Err(MbtError::InvalidDataFormat(
+            src_mbtiles.filepath().to_string(),
+        ));
     }
+
+    let _ = detect_type(&diff_mbtiles).await?;
+
+    query("ATTACH DATABASE ? AS diffDb")
+        .bind(diff_mbtiles.filepath())
+        .execute(&mut conn)
+        .await?;
+
+    query(
+        "
+    DELETE FROM tiles 
+    WHERE (zoom_level, tile_column, tile_row) IN 
+        (SELECT zoom_level, tile_column, tile_row FROM diffDb.tiles WHERE tile_data ISNULL);
+
+    INSERT OR REPLACE INTO tiles (zoom_level, tile_column, tile_row, tile_data) 
+    SELECT * FROM diffDb.tiles WHERE tile_data NOTNULL;",
+    )
+    .execute(&mut conn)
+    .await?;
+
+    Ok(conn)
 }
 
 pub async fn copy_mbtiles_file(opts: TileCopierOptions) -> MbtResult<SqliteConnection> {
@@ -463,5 +501,35 @@ mod tests {
         )
         .await
         .is_none());
+    }
+
+    #[actix_rt::test]
+    async fn apply_diff_file() {
+        // Copy the src file to an in-memory DB
+        let src_file = PathBuf::from("../tests/fixtures/files/world_cities.mbtiles");
+        let src = PathBuf::from("file::memory:?cache=shared");
+
+        let _src_conn = copy_mbtiles_file(TileCopierOptions::new(src_file.clone(), src.clone()))
+            .await
+            .unwrap();
+
+        // Apply diff to the src data in in-memory DB
+        let diff_file = PathBuf::from("../tests/fixtures/files/world_cities_diff.mbtiles");
+        let mut src_conn = apply_mbtiles_diff(src, diff_file).await.unwrap();
+
+        // Verify the data is the same as the file the diff was generated from
+        let modified_file = PathBuf::from("../tests/fixtures/files/world_cities_modified.mbtiles");
+        let _ = query("ATTACH DATABASE ? AS otherDb")
+            .bind(modified_file.clone().to_str().unwrap())
+            .execute(&mut src_conn)
+            .await;
+
+        assert!(
+            query("SELECT * FROM tiles EXCEPT SELECT * FROM otherDb.tiles;")
+                .fetch_optional(&mut src_conn)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 }
