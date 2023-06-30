@@ -1,6 +1,8 @@
 extern crate core;
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::path::PathBuf;
 
 #[cfg(feature = "cli")]
@@ -11,8 +13,10 @@ use sqlx::{query, query_with, Arguments, Connection, Row, SqliteConnection};
 use crate::errors::MbtResult;
 use crate::mbtiles::MbtType;
 use crate::{MbtError, Mbtiles};
+use bbox::BoundingBox;
+use nalgebra::Point3;
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "cli", derive(Args))]
 pub struct TileCopierOptions {
     /// MBTiles file to read from
@@ -31,6 +35,9 @@ pub struct TileCopierOptions {
     /// List of zoom levels to copy
     #[cfg_attr(feature = "cli", arg(long, value_parser(ValueParser::new(HashSetValueParser{})), default_value=""))]
     zoom_levels: HashSet<u8>,
+    /// Bbox to be used to filter tiles
+    #[cfg_attr(feature = "cli", arg(long, value_parser(ValueParser::new(BoundingBoxValueParser{}))))]
+    bbox: BoundingBox<f32>,
     /// Compare source file with this file, and only copy non-identical tiles to destination
     #[cfg_attr(feature = "cli", arg(long, requires("force_simple")))]
     diff_with_file: Option<PathBuf>,
@@ -38,7 +45,61 @@ pub struct TileCopierOptions {
 
 #[cfg(feature = "cli")]
 #[derive(Clone)]
+struct BoundingBoxValueParser;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "BoundingBox")]
+pub struct BoundingBoxDef<S: 'static + Debug + Copy + PartialEq> {
+    pub min: Point3<S>,
+    pub max: Point3<S>,
+}
+
+#[derive(serde::Serialize)]
+struct BoundingBoxWrapper<'a>(#[serde(with = "BoundingBoxDef")] &'a BoundingBox<f32>);
+
+#[cfg(feature = "cli")]
+#[derive(Clone)]
 struct HashSetValueParser;
+
+#[cfg(feature = "cli")]
+impl clap::builder::TypedValueParser for BoundingBoxValueParser {
+    type Value = BoundingBox<f32>;
+
+    fn parse_ref(
+        &self,
+        _cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        /*let mut result = HashSet::<u8>::new();
+        let values = value
+            .to_str()
+            .ok_or(clap::Error::new(ErrorKind::ValueValidation))?
+            .trim();
+        if !values.is_empty() {
+            for val in values.split(',') {
+                result.insert(
+                    val.trim()
+                        .parse::<u8>()
+                        .map_err(|_| clap::Error::new(ErrorKind::ValueValidation))?,
+                );
+            }
+        }*/
+        /*    let bbox = BoundingBox::new(&Point3::new(1.0, 2.0, 3.0), &Point3::new(1.1, 2.2, 3.3));
+        println!(
+            "{}",
+            serde_json::to_string(&BoundingBoxWrapper(&bbox)).unwrap()
+
+            {"min":[1.0,2.0,3.0],"max":[1.1,2.2,3.3]}
+        );*/
+        let value_string = value
+            .to_str()
+            .ok_or(clap::Error::new(ErrorKind::ValueValidation))?
+            .trim();
+        let mut de = serde_json::Deserializer::from_str(value_string);
+        Ok(BoundingBoxDef::<f32>::deserialize(&mut de).unwrap())
+    }
+}
 
 #[cfg(feature = "cli")]
 impl clap::builder::TypedValueParser for HashSetValueParser {
@@ -83,6 +144,7 @@ impl TileCopierOptions {
             force_simple: false,
             min_zoom: None,
             max_zoom: None,
+            bbox: BoundingBox::new(&Point3::new(1.0, 2.0, 3.0), &Point3::new(1.1, 2.2, 3.3)),
             diff_with_file: None,
         }
     }
@@ -109,6 +171,11 @@ impl TileCopierOptions {
 
     pub fn diff_with_file(mut self, diff_with_file: PathBuf) -> Self {
         self.diff_with_file = Some(diff_with_file);
+        self
+    }
+
+    pub fn bbox(mut self, bbox: BoundingBox<f32>) -> Self {
+        self.bbox = bbox;
         self
     }
 }

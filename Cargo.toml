@@ -15,6 +15,7 @@ actix-rt = "2"
 actix-web = "4"
 anyhow = "1.0"
 async-trait = "0.1"
+bbox = "0.11.2"
 brotli = "3"
 cargo-husky = { version = "1", features = ["user-hooks"], default-features = false }
 clap = { version = "4", features = ["derive"] }
@@ -29,6 +30,7 @@ itertools = "0.11"
 log = "0.4"
 martin-mbtiles = { path = "./martin-mbtiles", version = "0.2.0", default-features = false }  # disable CLI tools
 martin-tile-utils = { path = "./martin-tile-utils", version = "0.1.0" }
+nalgebra = { version = "0.22.1", features = ["serde-serialize"] }
 num_cpus = "1"
 openssl = "0.10"
 pmtiles = { version = "0.2.2", features = ["mmap-async-tokio", "tilejson"] }

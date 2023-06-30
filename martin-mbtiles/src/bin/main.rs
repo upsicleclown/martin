@@ -6,7 +6,7 @@ use martin_mbtiles::{apply_mbtiles_diff, copy_mbtiles_file, Mbtiles, TileCopierO
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, SqliteConnection};
 
-#[derive(Parser, PartialEq, Eq, Debug)]
+#[derive(Parser, PartialEq, Debug)]
 #[command(
     version,
     name = "mbtiles",
@@ -20,7 +20,7 @@ pub struct Args {
     command: Commands,
 }
 
-#[derive(Subcommand, PartialEq, Eq, Debug)]
+#[derive(Subcommand, PartialEq, Debug)]
 enum Commands {
     // /// Prints all values in the metadata table.
     // #[command(name = "meta-all")]
