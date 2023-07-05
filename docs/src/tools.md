@@ -20,3 +20,10 @@ Copy an mbtiles file, optionally filtering its content by zoom levels. Can also 
 ```shell
 mbtiles copy src_file.mbtiles dst_file.mbtiles --min-zoom 0 --max-zoom 10 --force-simple
 ```
+
+### apply-diff
+Apply the diff file generated from `copy` to an mbtiles file. The diff file can be applied to the `src_file.mbtiles` elsewhere, to avoid copying large files when only small updates are needed.
+```shell
+mbtiles apply_diff src_file.mbtiles diff_file.mbtiles
+```
+  **_NOTE:_** This _only_ works for mbtiles files in the simple tables format; it does _not_ work for mbtiles files in deduplicated format.

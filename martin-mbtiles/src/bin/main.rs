@@ -2,11 +2,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use martin_mbtiles::{copy_mbtiles_file, Mbtiles, TileCopierOptions};
+use martin_mbtiles::{apply_mbtiles_diff, copy_mbtiles_file, Mbtiles, TileCopierOptions};
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, SqliteConnection};
 
-#[derive(Parser, PartialEq, Eq, Debug)]
+#[derive(Parser, PartialEq, Debug)]
 #[command(
     version,
     name = "mbtiles",
@@ -20,7 +20,7 @@ pub struct Args {
     command: Commands,
 }
 
-#[derive(Subcommand, PartialEq, Eq, Debug)]
+#[derive(Subcommand, PartialEq, Debug)]
 enum Commands {
     // /// Prints all values in the metadata table.
     // #[command(name = "meta-all")]
@@ -45,6 +45,14 @@ enum Commands {
     /// Copy tiles from one mbtiles file to another.
     #[command(name = "copy")]
     Copy(TileCopierOptions),
+    /// Apply diff file generated from 'copy' command
+    #[command(name = "apply-diff")]
+    ApplyDiff {
+        /// MBTiles file to apply diff to
+        src_file: PathBuf,
+        /// Diff file
+        diff_file: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -57,6 +65,12 @@ async fn main() -> Result<()> {
         }
         Commands::Copy(opts) => {
             copy_mbtiles_file(opts).await?;
+        }
+        Commands::ApplyDiff {
+            src_file,
+            diff_file,
+        } => {
+            apply_mbtiles_diff(src_file, diff_file).await?;
         }
     }
 
@@ -186,6 +200,46 @@ mod tests {
                 command: Copy(
                     TileCopierOptions::new(PathBuf::from("src_file"), PathBuf::from("dst_file"))
                         .zoom_levels(vec![1, 3, 7])
+                )
+            }
+        );
+    }
+
+    #[test]
+    fn test_copy_diff_with_file_no_force_simple_arguments() {
+        assert_eq!(
+            Args::try_parse_from([
+                "mbtiles",
+                "copy",
+                "src_file",
+                "dst_file",
+                "--diff-with-file",
+                "no_file",
+            ])
+            .unwrap_err()
+            .kind(),
+            ErrorKind::MissingRequiredArgument
+        );
+    }
+
+    #[test]
+    fn test_copy_diff_with_file_arguments() {
+        assert_eq!(
+            Args::parse_from([
+                "mbtiles",
+                "copy",
+                "src_file",
+                "dst_file",
+                "--diff-with-file",
+                "no_file",
+                "--force-simple"
+            ]),
+            Args {
+                verbose: false,
+                command: Copy(
+                    TileCopierOptions::new(PathBuf::from("src_file"), PathBuf::from("dst_file"))
+                        .diff_with_file(PathBuf::from("no_file"))
+                        .force_simple(true)
                 )
             }
         );

@@ -12,12 +12,13 @@ license.workspace = true
 [features]
 # TODO: Disable "cli" feature in default builds
 default = ["cli"]
-cli = ["dep:anyhow", "dep:clap", "dep:tokio"]
+cli = ["dep:anyhow", "dep:bbox", "dep:clap", "dep:nalgebra","dep:tokio"]
 
 [dependencies]
 futures.workspace = true
 log.workspace = true
 martin-tile-utils.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
@@ -25,7 +26,9 @@ tilejson.workspace = true
 
 # Bin dependencies
 anyhow = { workspace = true, optional = true }
+bbox = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
+nalgebra = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
